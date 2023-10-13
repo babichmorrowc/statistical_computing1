@@ -1,0 +1,83 @@
+---
+title: "Common R Functions"
+output: html_document
+date: "2023-10-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Vectorisation vs. `apply`
+
+In this section, we compared the performance of for loops, vectorisation, and the `apply` family of functions. I wanted to take a look at how these different approaches affected performance when used for one of the exercises from the Statistical Methods computing lab. In this lab, we were asked to generate a random variable from a multivariate normal distribution using univariate random variables (rather than using an existing function for multivariate normal). Below, I have written different functions to do this using (1) 2 for loops, (2) 1 for loop, (3) vectorisation, and (4) `apply` to compare the performance.
+
+All the functions below take the following parameters:
++ `dimension`: the dimension of the random variable $\textbf{x}$ to be generated, i.e. $\textbf{x} \in \mathbb{R}^\text{dimension}$
++ `mu`: the mean of $\textbf{x}$, such that $\mu \in \mathbb{R}^\text{dimension}$ as well
++ `Sigma`: the covariance matrix of $\textbf{x}$
++ `n_samples`: the number of samples to draw from the univariate normal distribution
+
+### 2 for loops
+
+In this case, I have written 2 for loops. The inner one loops over `dimension` to calculate each element of my vector $\textbf{y}$, where $\textbf{y} = U^\top(\textbf{x} - \mu)$ is the change of variables used to express the multivariate normal in terms of a univariate normal random variable. The second loops over the number of samples I am trying to calculate to generate $\textbf{x}$ for each sample.
+
+```{r}
+mvn_generator_1_for_loops <- function(dimension, mu, Sigma, n_samples) {
+  if(!matrixcalc::is.positive.definite(Sigma)) {
+    stop("Sigma is not positive definite!")
+  }
+  
+  # Find the eigendecomposition of Sigma inverse
+  ev_Sigma_inv <- eigen(solve(Sigma))
+  U <- ev_Sigma_inv$vectors
+  eigenvalues <- ev_Sigma_inv$values
+  D <- diag(eigenvalues)
+  if(!all.equal(U %*% D %*% solve(U), solve(Sigma))) {
+    stop("Something has gone wrong in your eigendecomposition!")
+  }
+  
+  x_samples <- matrix(0, nrow = dimension, ncol = n_samples)
+  for (i in 1:n_samples) {
+    y_i <- matrix(0, nrow = dimension, ncol = 1)
+    for (j in 1:dimension) {
+      y_i[j] <- rnorm(1, mean = 0, sd = sqrt(1/eigenvalues[j]))
+    }
+    x_i <- U %*% y_i + mu
+    x_samples[,i] <- x_i
+  }
+  
+  return(x_samples)
+  
+}
+```
+
+### 1 for loop
+
+```{r}
+mvn_generator_1_for_loops <- function(dimension, mu, Sigma, n_samples) {
+  if(!is.positive.definite(Sigma)) {
+    stop("Sigma is not positive definite!")
+  }
+  
+  # Find the eigendecomposition of Sigma inverse
+  ev_Sigma_inv <- eigen(solve(Sigma))
+  U <- ev_Sigma_inv$vectors
+  eigenvalues <- ev_Sigma_inv$values
+  D <- diag(eigenvalues)
+  if(!all.equal(U %*% D %*% solve(U), solve(Sigma))) {
+    stop("Something has gone wrong in your eigendecomposition!")
+  }
+  
+  x_samples <- matrix(0, nrow = dimension, ncol = n_samples)
+  for (i in 1:n_samples) {
+    y_i <- rnorm(n = dimension, mean = rep(0, dimension), sd = sqrt(1/eigenvalues))
+    x_i <- U %*% y_i + mu
+    x_samples[,i] <- x_i
+  }
+  
+  return(x_samples)
+  
+}
+```
+
