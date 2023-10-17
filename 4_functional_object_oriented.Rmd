@@ -1,0 +1,56 @@
+---
+title: "Functional and Object-Oriented Programming"
+output: html_document
+date: "2023-10-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Object-Oriented Programming
+
+### Imperative vs. Declarative Programming
+
+Declarative programming: saying what you want
+Imperative programming: saying how to get what you want
+No way to avoid imperative programming
+Imperative programming is easier to read
+
+Functional programming: no internal states, everything passed from one function to the next (is declarative)
+Imperative programming style emphasizes changes in state (rather than application of functions)
+
+Object-oriented programming (see the wikipedia)
+Is imperative
+
+### Object-Oriented Programming in R
+
+S3 is simple, reference classes is well implemented (S4 is neither lol)
+
+#### S3
+
+Create a list, then set the class (class is typically the name  of the function)
+`str` function displays structure of the object
+You can create specialized versions of generic methods that work specifically for your class -- then when you run `print` or `plot` on an object of this class, R will run the specific version rather than the default
+
+#### S4
+
+More formal than S3: everything needs to be defined explicitly (rather than by convention, as in S3)
+The fields for a given class are called `slots`
+Initialization function: takes in an object and additional inputs
+1. assign all the slots in the class
+2. if any slots need to be computed, compute them
+3. return the object with all the slots either assigned or computed
+You can set methods for the class in a similar way
+Getter vs. setter
+Setter in R uses `<-` (not `=`)
+Need to do `setGeneric` and then `setMethod`
+
+#### Reference classes
+
+Now calling fields `fields`
+Use `setRefClass` (instead of `setClass` as in S4)
+In portfolio, can redo the linear regression example in reference classes
+Define all the methods as part of the class definition
+Reference class is consistent (compared to S4)
+
