@@ -1,6 +1,8 @@
 ---
 title: "Packages, Version Control, & Testing"
-output: html_document
+output:
+  pdf_document: 
+    latex_engine: xelatex
 date: "2023-10-03"
 ---
 
@@ -29,3 +31,15 @@ Warning message:
 ```
 
 which indicates that as of the most recent version of the `usethis` package, it is best to run `use_github_action("check-standard")` instead. I made a small [pull request](https://github.com/awllee/sc1/pull/7) to update this in the course website.
+
+I noticed that the GitHub Actions workflows were failing, so I worked on a series of fixes, mostly having to do with the need to explicitly note the package from which a given function was taken, e.g. `alphahull::ahull`. I also found that by running `devtools::check_rhub()` in the RStudio Console, I could run CRAN checks on the package before pushing my changes (which is faster than waiting for the entire GitHub Actions checks to finish after pushing).
+
+### Package improvements
+
+I had an Australian scientist named Fonti Kar reach out to me about how we might modify my R package to be used to convert alpha hulls for IUCN range assessments. The developer of the `alphahull` package, Beatriz Pateiro, has been working on a new feature to create alpha-hull objects following the IUCN Red List method of creation.
+
+She can add documentation / tests / GitHub actions / landing page 
+We could do a Hex sticker
+I will work on the maths
+What's the other package that does this?
+
