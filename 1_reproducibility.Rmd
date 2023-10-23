@@ -1,8 +1,9 @@
 ---
 title: "Reproducibility & Literate Programming"
 author: "Cecina Babich Morrow"
-output: html_document
 date: "2023-09-29"
+output:
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
