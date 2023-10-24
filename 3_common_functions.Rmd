@@ -1,11 +1,14 @@
 ---
 title: "Common R Functions"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 date: "2023-10-13"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(matrixcalc)
 ```
 
 ## Vectorisation vs. `apply`
@@ -18,12 +21,20 @@ All the functions below take the following parameters:
 + `Sigma`: the covariance matrix of $\textbf{x}$
 + `n_samples`: the number of samples to draw from the univariate normal distribution
 
+I show the results of each function using the following objects:
+
+```{r}
+plot_mu <- matrix(c(2,1), ncol = 1)
+plot_Sigma <- matrix(c(1,0.5,0.5,1), ncol = 2)
+```
+
+
 ### 2 for loops
 
 In this case, I have written 2 for loops. The inner one loops over `dimension` to calculate each element of my vector $\textbf{y}$, where $\textbf{y} = U^\top(\textbf{x} - \mu)$ is the change of variables used to express the multivariate normal in terms of a univariate normal random variable. The second loops over the number of samples I am trying to calculate to generate $\textbf{x}$ for each sample.
 
-```{r}
-mvn_generator_1_for_loops <- function(dimension, mu, Sigma, n_samples) {
+```{r 2_loop_fn}
+mvn_generator_2_for_loops <- function(dimension, mu, Sigma, n_samples) {
   if(!matrixcalc::is.positive.definite(Sigma)) {
     stop("Sigma is not positive definite!")
   }
@@ -52,10 +63,27 @@ mvn_generator_1_for_loops <- function(dimension, mu, Sigma, n_samples) {
 }
 ```
 
+We can check the speed of the above function:
+
+```{r 2_loop_speed}
+tictoc::tic()
+sample <- mvn_generator_2_for_loops(dimension = 2, mu = plot_mu, Sigma = plot_Sigma, n_samples = 10000)
+tictoc::toc()
+```
+
+We can plot the result to verify that our function is appropriately sampling the way it should be:
+
+```{r 2_loop_plot}
+sample_t <- t(sample)
+plot(sample_t[,2] ~ sample_t[,1])
+```
+
 ### 1 for loop
 
-```{r}
-mvn_generator_1_for_loops <- function(dimension, mu, Sigma, n_samples) {
+Alternatively, we can use a single for loop to decrease computation time:
+
+```{r 1_loop_fn}
+mvn_generator_1_for_loop <- function(dimension, mu, Sigma, n_samples) {
   if(!is.positive.definite(Sigma)) {
     stop("Sigma is not positive definite!")
   }
@@ -81,3 +109,124 @@ mvn_generator_1_for_loops <- function(dimension, mu, Sigma, n_samples) {
 }
 ```
 
+Now comparing the speed using only a single for loop:
+
+```{r 1_loop_speed}
+tictoc::tic()
+sample <- mvn_generator_1_for_loop(dimension = 2, mu = plot_mu, Sigma = plot_Sigma, n_samples = 10000)
+tictoc::toc()
+```
+
+Removing one of the for loops makes the function over three times faster (although this varied a bit depending on whether I was running the code in my console or in the knitted RMarkdown). Checking that our function is still sampling properly:
+
+```{r 1_loop_plot}
+sample_t <- t(sample)
+plot(sample_t[,2] ~ sample_t[,1])
+```
+
+### Vectorisation
+
+We can eliminate the for-loops altogether by making use of vectorisation in R.
+
+```{r vector_fn}
+mvn_generator_vector <- function(dimension, mu, Sigma, n_samples) {
+  if(!is.positive.definite(Sigma)) {
+    stop("Sigma is not positive definite!")
+  }
+  
+  # Find the eigendecomposition of Sigma inverse
+  ev_Sigma_inv <- eigen(solve(Sigma))
+  U <- ev_Sigma_inv$vectors
+  eigenvalues <- ev_Sigma_inv$values
+  D <- diag(eigenvalues)
+  if(!all.equal(U %*% D %*% solve(U), solve(Sigma))) {
+    stop("Something has gone wrong in your eigendecomposition!")
+  }
+  
+  y_samples <- matrix(rnorm(n = dimension*n_samples,
+                            mean = rep(0, dimension*n_samples),
+                            sd = rep(sqrt(1/eigenvalues), n_samples)),
+                      nrow = dimension,
+                      ncol = n_samples)
+  x_samples <- U %*% y_samples + matrix(rep(mu, n_samples), nrow = dimension, ncol = n_samples)
+  
+  return(x_samples)
+  
+}
+```
+
+Speed with vectorisation:
+
+```{r vector_speed}
+tictoc::tic()
+sample <- mvn_generator_vector(dimension = 2, mu = plot_mu, Sigma = plot_Sigma, n_samples = 10000)
+tictoc::toc()
+```
+
+The vectorised version of the function was approximately 4.5 times faster than the version with a single for loop, making this a huge improvement. We check the results again:
+
+```{r vector_plot}
+sample_t <- t(sample)
+plot(sample_t[,2] ~ sample_t[,1])
+```
+
+### `apply` family
+
+R also has a family of functions known as the `apply` family that allows us to apply the same function over and over across a given object. It contains the following functions:
+
++ `apply()`: Applies a function over an array or a matrix (note, `apply()` must be applied to data with greater than one dimension)
++ `lapply()`: Applies a function over a list or vector to return a list
++ `sapply()`: Works like `lapply()` but returns a simplified output, rather than a list
++ `mapply()`: Works like `sapply()` in multivariate situations
+
+We can make use of the -- function to rewrite our multivariate normal function once more:
+
+```{r apply_fn}
+mvn_generator_apply <- function(dimension, mu, Sigma, n_samples) {
+  if(!is.positive.definite(Sigma)) {
+    stop("Sigma is not positive definite!")
+  }
+  
+  # Find the eigendecomposition of Sigma inverse
+  ev_Sigma_inv <- eigen(solve(Sigma))
+  U <- ev_Sigma_inv$vectors
+  eigenvalues <- ev_Sigma_inv$values
+  D <- diag(eigenvalues)
+  if(!all.equal(U %*% D %*% solve(U), solve(Sigma))) {
+    stop("Something has gone wrong in your eigendecomposition!")
+  }
+  
+  # Create a matrix where the first column is the means and the second is the standard deviations
+  mean_sd <- matrix(c(rep(0, dimension), sqrt(1/eigenvalues)), nrow = dimension, ncol = 2)
+  y_samples <- t(apply(mean_sd, 1, function(x) rnorm(n_samples, mean = x[1], sd = x[2])))
+  x_samples <- U %*% y_samples + matrix(rep(mu, n_samples), nrow = dimension, ncol = n_samples)
+  
+  return(x_samples)
+  
+}
+```
+
+Speed with `apply()`:
+
+```{r apply_speed}
+tictoc::tic()
+sample <- mvn_generator_apply(dimension = 2, mu = plot_mu, Sigma = plot_Sigma, n_samples = 10000)
+tictoc::toc()
+```
+
+Speed with `apply()` was essentially identical to the speed with the vectorised function. These speed tests are a bit different than what was shown in the [course notes](https://awllee.github.io/sc1/common-r/apply/), which showed the for loop as faster than `lapply`. Results check:
+
+```{r apply_plot}
+sample_t <- t(sample)
+plot(sample_t[,2] ~ sample_t[,1])
+```
+
+## Parallel programming
+
+It is possible to parallelise R code to distribute code across different cores / processors. The `parallel` function contains `mclapply()` and `mcmapply()` functions, which are the parallelised versions of the `lapply` and `mapply` functions respectively. Note that these functions will not work on Windows. You can check the number of cores available with which to run these functions in the following way:
+
+```{r}
+parallel::detectCores()
+```
+
+Alternatively, the `foreach` and `doParallel` packages can also be used to evaluate R code in parallel using a set number of cores.
