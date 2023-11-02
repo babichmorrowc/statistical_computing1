@@ -1,15 +1,172 @@
 ---
 title: "Tidyverse"
-output: html_document
-date: "2023-10-24"
+output:
+  pdf_document: default
+  html_document: default
+date: "2023-11-02"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
 ```
 
 ## Tidyverse
 
-The Tidyverse comprises 
+The Tidyverse is an ecosystem of compatible packages that share the same programming philosophy, centered around the concept of "tidy" data, i.e. data that is formatted in a specific way to make it easy to analyze and visualize.
 
-tidytuesday
+### Pipes
+
+There are several types of pipe operators provided by the `magrittr` package:
+
++ `%>%`: takes the output from one function/operation and passes it as an element (by default, the first) to the next function, enabling a flow from left-to-right (rather than from inner functions to outer functions). This is the most commonly used pipe operator in R
++ `%<>%`: performs the piped operations and stores the result via assignment (must be the first pipe)
++ `%T>%`: allows the storage of the partial results of a pipe, which is especially useful if the final results are a side-effect such as plotting or printing
++ `%$%`: makes the names of the object on the left-hand side of the pipe available in the function call on the right-hand side
+
+### `ggplot2`
+
+Similarly to how pipes enable the flow of objects (often data) from left to right, the data visualization package `ggplot2` enables the addition of graphical layers to plots from left to right. In `ggplot2`, each additional layer is added using a `+` sign, allowing the specification of data, aesthetics (e.g. color, line-type, etc.), and geometries (e.g. points, lines, etc.) at each stage. This "Grammar of Graphics" makes visualizations highly customizable, far more than the plotting functions in base R.
+
+## Energy example
+
+For the remainder of this portfolio, I will use tidyverse packages to manipulate and visualize some of the data available in the [AHSRAE - Great Energy Predictor III](https://www.kaggle.com/competitions/ashrae-energy-prediction/overview) Kaggle dataset.
+
+### Import data
+
+I start by using the `readr` package to load in several of the datasets from Kaggle:
+
+```{r}
+library(readr)
+
+# Import train data
+train <- read_csv("../data/train.csv")
+building_metadata <- read_csv("../data/building_metadata.csv")
+```
+
+We can view the first few rows of each dataset:
+
+```{r}
+head(train)
+head(building_metadata)
+```
+
+### Join data
+
+We can see that both datasets contain a `building_id` column, which is the primary key for `building_metadata` as well as a foreign key linking the two datasets. We can use functions from `dplyr` to join the datasets:
+
+```{r}
+library(dplyr)
+
+train_building_metadata <- train %>% 
+  left_join(building_metadata, by = "building_id")
+head(train_building_metadata)
+```
+
+### Summarize data
+
+We can use other `dplyr` functionality to calculate some aggregate values based on the metadata:
+
+```{r}
+# Calculate summary values for meter readings
+# For each building
+agg_reading_per_building <- train_building_metadata %>% 
+  group_by(building_id) %>% 
+  summarise(
+    mean_meter_reading = mean(meter_reading),
+    median_meter_reading = median(meter_reading),
+    max_meter_reading = max(meter_reading)
+  )
+head(agg_reading_per_building)
+
+# Do the same grouped by site
+agg_reading_per_site <- train_building_metadata %>% 
+  group_by(site_id) %>% 
+  summarise(
+    mean_meter_reading = mean(meter_reading),
+    median_meter_reading = median(meter_reading),
+    max_meter_reading = max(meter_reading)
+  )
+agg_reading_per_site
+
+# Do the same grouped by the building use
+agg_reading_per_use <- train_building_metadata %>% 
+  group_by(primary_use) %>% 
+  summarise(
+    mean_meter_reading = mean(meter_reading),
+    median_meter_reading = median(meter_reading),
+    max_meter_reading = max(meter_reading)
+  )
+agg_reading_per_use
+```
+
+### Visualize data
+
+It appears that there are large differences in meter readings based on the primary use of the building. We can visualize the distribution of meter readings by primary use using `ggplot2`:
+
+```{r}
+library(ggplot2)
+library(forcats) # to allow us to reorder the boxplot
+
+train_building_metadata %>% 
+  # Fix situations where meter reading was 0 for the log-transform
+  mutate(meter_reading = ifelse(meter_reading == 0,
+                                meter_reading + 0.000000001,
+                                meter_reading)) %>% 
+  # Create variable of log-transformed meter reading for viz purposes
+  mutate(log_meter_reading = log(meter_reading)) %>% 
+  ggplot(aes(
+    # Order the boxplot by descending median log meter reading
+    x = fct_reorder(primary_use, log_meter_reading, .desc = TRUE),
+    y = log_meter_reading
+  )
+  ) +
+  geom_boxplot() +
+  labs(x = "Building use",
+       y = "Log meter reading") +
+  # Rotate the x-axis labels so we can read them
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+Note that creating this plot is quite slow given the size of our data, but it allows us to illustrate some of the nice properties of `ggplot2`.
+
+Aggregating all meter readings for buildings of a particular use may help us see overall patterns, but meter usage is likely to fluctuate substantially over time. We can examine average daily meter readings per building use over time:
+
+```{r}
+library(lubridate) # for date manipulations
+
+# Create a dataframe of the average daily meter reading by building use
+avg_daily_meter <- train_building_metadata %>% 
+  mutate(meter_date = as_date(timestamp)) %>% 
+  group_by(primary_use,
+           meter_date) %>% 
+  summarise(med_reading = median(meter_reading))
+
+ggplot(data = avg_daily_meter,
+       aes(x = meter_date,
+           y = med_reading,
+           color = primary_use)) +
+  geom_line() +
+  labs(x = "Date", y = "Median meter reading", color = "Building use")
+```
+
+We can also use `facet_wrap()` to plot each building use in its own plot arranged in a grid:
+
+```{r}
+ggplot(data = avg_daily_meter,
+       aes(x = meter_date,
+           y = med_reading,
+           color = primary_use)) +
+  geom_line() +
+  facet_wrap(~ primary_use) +
+  labs(x = "Date", y = "Median meter reading", color = "Building use") +
+  # Decrease the number of x-axis breaks to 3
+  scale_x_continuous(breaks = seq(min(avg_daily_meter$meter_date), max(avg_daily_meter$meter_date), length.out = 3)) +
+  theme(
+    # Remove the color legend which takes up a ton of space
+    legend.position = "none",
+    # Rotate the x-axis labels so we can read them
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)
+  )
+```
+
+
