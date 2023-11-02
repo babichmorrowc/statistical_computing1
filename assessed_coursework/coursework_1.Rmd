@@ -1,0 +1,18 @@
+---
+title: 'Assessed Coursework #1'
+output: html_document
+date: "2023-11-02"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Expanding package functionality
+
+I had an Australian scientist named Fonti Kar reach out to me about how we might modify my R package to be used to convert alpha hulls for IUCN range assessments. The developer of the `alphahull` package, Beatriz Pateiro, has been working on a new feature to create alpha-hull objects following the IUCN Red List method of creation.
+
+She can add documentation / tests / GitHub actions / landing page 
+We could do a Hex sticker
+I will work on the maths
+What's the other package that does this?
