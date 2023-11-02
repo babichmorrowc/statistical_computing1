@@ -1,0 +1,35 @@
+---
+title: "Performance & Bugs"
+output: html_document
+date: "2023-10-31"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Debugging
+
+Debugging refers to the process of fixing "bugs", i.e. errors in code causing erroneous results or errors. There are many potential strategies and tools for carrying out the debugging process.
+
+From a philosophical standpoint, we can think of debugging using the process of the scientific method. In this framework, you can run experiments on the code using toy examples to check whether the output matches the expected hypothesis. If the bug in question produces an error message, you can start with this message to try to understand the cause of the error. Best case scenario, the error message is informative and can point you in the direction of what needs to be fixed. If the error message is more cryptic, debugging requires further investigation. To run experiments to determine the nature of the bug, you should try to create a reproducible, minimal working example: the simplest possible example that produces the error and can be reproduced (both by you and by others, if necessary). This helps avoid a situation where you are trying to test your code on a very complex set of data, for example, where the issue could arise from any number of places. Additionally, by creating a reproducible example, you can share your issue with other people, e.g. on StackOverflow or by creating a GitHub issue if you identify a bug in someone else's code.
+
+## Profiling
+
+In R, we can use the `profvis` package to profile. This package is a statistical profile, which regularly interrupts the operating system and checks what code is being executed, determining where the code is spending most of the time.
+
+In R, we want to avoid for loops that don't contain substantial amounts of computation within each iteration of the loop. In this case, it is almost always better to vectorize the code instead in order to eliminate unnecessary for loops.
+
+Profiling allows us to see where the code is spending the most time. This helps prioritize where to spend effort optimizing: in order to improve overall performance, it is most impactful to improve the performance of the part of the code that takes the most computation time. Additionally, in situations where there is a trade-off between readability and performance, profiling can show whether the increase in overall performance would be worth any loss in readability.
+
+## Performance
+
+R code typically has worse performance than code written in a language like C. However, R has several useful features to minimize the chance of making an error.
+
+### Memory management
+
+Pass by value vs. pass by reference
+
+### Column-major storage
+
+
