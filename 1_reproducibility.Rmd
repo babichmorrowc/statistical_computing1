@@ -28,7 +28,10 @@ head(penguins)
 ```{r}
 ggplot(penguins, aes(x = flipper_length_mm, y = body_mass_g, color = species)) +
   geom_point() +
-  labs(x = "Flipper length (mm)", y = "Body mass (g)", color = "Species", main = "Relationship between flipper length and body mass by species")
+  labs(x = "Flipper length (mm)",
+       y = "Body mass (g)",
+       color = "Species",
+       title = "Relationship between flipper length and body mass\nby species")
 ```
 
 ## R & RMarkdown practice
@@ -59,7 +62,9 @@ tictoc::tic() # start time counter
 for (i in 1:length(three_digit_numbers)) {
   for (j in 1:length(three_digit_numbers)) {
     product_ij <- three_digit_numbers[i]*three_digit_numbers[j]
-    # If the product is a palindrome and if it is larger than the previous largest palindrome, set it as the largest
+    # If the product is a palindrome
+    # and if it is larger than the previous largest palindrome,
+    # set it as the largest
     if(is_palindrome(product_ij) & product_ij > largest_palindrome) {
       largest_palindrome <- product_ij
     }
@@ -84,7 +89,9 @@ for (i in 1:length(three_digit_numbers)) {
     for (j in 1:length(three_digit_numbers)) {
       number_j <- three_digit_numbers[length(three_digit_numbers)+1-j]
       product_ij <- number_i*number_j
-      # If the product is a palindrome and if it is larger than the previous largest palindrome, set it as the largest
+      # If the product is a palindrome
+      # and if it is larger than the previous largest palindrome,
+      # set it as the largest
     if(is_palindrome(product_ij) & product_ij > largest_palindrome) {
       largest_palindrome <- product_ij
     }

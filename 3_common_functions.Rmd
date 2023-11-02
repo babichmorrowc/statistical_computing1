@@ -16,6 +16,7 @@ library(matrixcalc)
 In this section, we compared the performance of for loops, vectorisation, and the `apply` family of functions. I wanted to take a look at how these different approaches affected performance when used for one of the exercises from the Statistical Methods computing lab. In this lab, we were asked to generate a random variable from a multivariate normal distribution using univariate random variables (rather than using an existing function for multivariate normal). Below, I have written different functions to do this using (1) 2 for loops, (2) 1 for loop, (3) vectorisation, and (4) `apply` to compare the performance.
 
 All the functions below take the following parameters:
+
 + `dimension`: the dimension of the random variable $\textbf{x}$ to be generated, i.e. $\textbf{x} \in \mathbb{R}^\text{dimension}$
 + `mu`: the mean of $\textbf{x}$, such that $\mu \in \mathbb{R}^\text{dimension}$ as well
 + `Sigma`: the covariance matrix of $\textbf{x}$
@@ -67,7 +68,10 @@ We can check the speed of the above function:
 
 ```{r 2_loop_speed}
 tictoc::tic()
-sample <- mvn_generator_2_for_loops(dimension = 2, mu = plot_mu, Sigma = plot_Sigma, n_samples = 10000)
+sample <- mvn_generator_2_for_loops(dimension = 2,
+                                    mu = plot_mu,
+                                    Sigma = plot_Sigma,
+                                    n_samples = 10000)
 tictoc::toc()
 ```
 
@@ -113,7 +117,10 @@ Now comparing the speed using only a single for loop:
 
 ```{r 1_loop_speed}
 tictoc::tic()
-sample <- mvn_generator_1_for_loop(dimension = 2, mu = plot_mu, Sigma = plot_Sigma, n_samples = 10000)
+sample <- mvn_generator_1_for_loop(dimension = 2,
+                                   mu = plot_mu,
+                                  Sigma = plot_Sigma,
+                                  n_samples = 10000)
 tictoc::toc()
 ```
 
@@ -148,7 +155,9 @@ mvn_generator_vector <- function(dimension, mu, Sigma, n_samples) {
                             sd = rep(sqrt(1/eigenvalues), n_samples)),
                       nrow = dimension,
                       ncol = n_samples)
-  x_samples <- U %*% y_samples + matrix(rep(mu, n_samples), nrow = dimension, ncol = n_samples)
+  x_samples <- U %*% y_samples + matrix(rep(mu, n_samples),
+                                        nrow = dimension,
+                                        ncol = n_samples)
   
   return(x_samples)
   
@@ -159,7 +168,10 @@ Speed with vectorisation:
 
 ```{r vector_speed}
 tictoc::tic()
-sample <- mvn_generator_vector(dimension = 2, mu = plot_mu, Sigma = plot_Sigma, n_samples = 10000)
+sample <- mvn_generator_vector(dimension = 2,
+                               mu = plot_mu,
+                               Sigma = plot_Sigma,
+                               n_samples = 10000)
 tictoc::toc()
 ```
 
@@ -196,10 +208,13 @@ mvn_generator_apply <- function(dimension, mu, Sigma, n_samples) {
     stop("Something has gone wrong in your eigendecomposition!")
   }
   
-  # Create a matrix where the first column is the means and the second is the standard deviations
+  # Create a matrix where the first column is the means
+  # and the second is the standard deviations
   mean_sd <- matrix(c(rep(0, dimension), sqrt(1/eigenvalues)), nrow = dimension, ncol = 2)
   y_samples <- t(apply(mean_sd, 1, function(x) rnorm(n_samples, mean = x[1], sd = x[2])))
-  x_samples <- U %*% y_samples + matrix(rep(mu, n_samples), nrow = dimension, ncol = n_samples)
+  x_samples <- U %*% y_samples + matrix(rep(mu, n_samples),
+                                        nrow = dimension,
+                                        ncol = n_samples)
   
   return(x_samples)
   
@@ -210,7 +225,10 @@ Speed with `apply()`:
 
 ```{r apply_speed}
 tictoc::tic()
-sample <- mvn_generator_apply(dimension = 2, mu = plot_mu, Sigma = plot_Sigma, n_samples = 10000)
+sample <- mvn_generator_apply(dimension = 2,
+                              mu = plot_mu,
+                              Sigma = plot_Sigma,
+                              n_samples = 10000)
 tictoc::toc()
 ```
 
@@ -229,4 +247,4 @@ It is possible to parallelise R code to distribute code across different cores /
 parallel::detectCores()
 ```
 
-Alternatively, the `foreach` and `doParallel` packages can also be used to evaluate R code in parallel using a set number of cores.
+Alternatively, the `foreach` and `doParallel` packages can also be used to evaluate R code in parallel using a set number of cores, which can be a more versatile choice that `mclapply` in complex situations.
