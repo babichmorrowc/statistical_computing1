@@ -1,0 +1,30 @@
+---
+title: "Numerical integration"
+output: pdf_document
+date: "2023-11-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Integration
+
+## Quadrature
+
+Polynomial interpolation is at the heart of quadrature. To use quadrature, we'll start by numerically approximating the definite integral of a function over a finite interval using a polynomial function, since polynomials can be integrated exactly.
+
+### Lagrange polynomials
+
+Get a unique polynomial through the $k$ points, with maximum degree of $k-1$
+
+### Polynomial interpolation error
+
+### Composite polynomial interpretation
+
+Instead, we can create a piecewise polynomial approximation
+
+## Monte Carlo
+
+For one-dimensional integrals, quadrature is an appropriate technique. For higher dimensions, however, quadrature rules become far too computationally expensive. Monte Carlo algorithms are a good alternative in these higher dimensions.
+
