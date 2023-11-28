@@ -1,0 +1,40 @@
+---
+title: "Optimization"
+output: pdf_document
+date: "2023-11-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Numerical Optimization
+
+We focus on minimizing a function (which is equivalent to maximizing the negative). In general, optimization problems are of the form
+$$\arg \min_x f(x) \text{ subject to } g_i(x) \leq 0 \text{ for } i \in \{1,...,m\} \\
+\text{ and } h_j(x) = 0 \text{ for } j \in \{1,...,p\}$$
+where we are minimizing a function $f: \mathbb{R}^n \rightarrow \mathbb{R}$
+} subject to some inequality and equality constraints. Optimization problems that are discrete and/or have constraints are more difficult to solve than continuous and/or unconstrained problems.
+
+### `optimize` function
+
+Base R has the `optimize` function, which only works on one dimension. `optimize` attempts to find a minimum using a golden section search algorithm.
+
+### Newton's method
+
+Advantage: it converges quickly
+
+### Multi-dimensional optimization
+
+Recommend `optim` function which gives choice of algorithms
+
+Newton-type methods: Fit a parabola locally and go to minimum of that parabola
+Faster than gradient descent
+Hessian is $n \times n$ dense matrix and need to compute the inverse, which is computationally difficult
+quasi-Newton method: BFGS -- approximates the Hessian and avoids matrix inversion
+
+[gradient descent & newton are the ones worth knowing]
+
+Simulated annealing: often fails to work in real-world situations
+
+
