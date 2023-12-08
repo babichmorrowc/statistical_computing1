@@ -1,7 +1,9 @@
 ---
 title: "Numerical integration"
 output: pdf_document
+author: "Cecina Babich Morrow"
 date: "2023-11-07"
+urlcolor: blue
 ---
 
 ```{r setup, include=FALSE}
@@ -10,21 +12,61 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Integration
 
+Many applications in statistics necessitate the calculation of integrals. Unfortunately many integrals cannot be computed in closed form, necessitating approximation techniques.
+
 ## Quadrature
 
-Polynomial interpolation is at the heart of quadrature. To use quadrature, we'll start by numerically approximating the definite integral of a function over a finite interval using a polynomial function, since polynomials can be integrated exactly.
+"Quadrature rules" refer to the process of approximating integrals, specifically in a deterministic way. Polynomial interpolation is at the heart of quadrature. To use quadrature, we'll start by numerically approximating the definite integral of a function over a finite interval using a polynomial function, since polynomials can be integrated exactly.
 
-### Lagrange polynomials
+### Gaussian quadrature
 
-Get a unique polynomial through the $k$ points, with maximum degree of $k-1$
+Gaussian quadrature attempts to approximate an integral as a weighted summation. There are many types of Gaussian quadrature, so this portfolio will focus on Gauss-Legendre quadrature. It aims to find an accurate approximation of the integral by selecting specific points (nodes) and associated weights for the integration. In the Gauss-Legendre quadrature, these nodes and weights are chosen in such a way that the method provides exact results for polynomials up to a certain degree. The nodes are typically roots of orthogonal polynomials, and the weights are determined to ensure optimal accuracy. The Gauss-Legendre quadrature is particularly effective for integrating functions over a finite interval.
 
-### Polynomial interpolation error
+Gauss-Legendre quadrature takes the form
+$$\int_{-1}^1 f(x) dx \approx \sum_{i = 1}^n w_i f(x_i)$$
+for a set of $n$ sample points and $w_i$ weights, where $x_i$ are the roots of the $n$th Legendre polynomials. This rule can provide exact integration of degree $2n - 1$ polynomials.
 
-### Composite polynomial interpretation
+```{r}
+library(statmod)
+# Calculate nodes and weights where n = 3
+gauss_3 <- gauss.quad(n = 3, kind = "legendre")
+# where n = 8
+gauss_8 <- gauss.quad(n = 8, kind = "legendre")
+```
 
-Instead, we can create a piecewise polynomial approximation
+```{r}
+example_poly <- function(x) 1 + x + x^2 + x^3 + x^4 + x^5
+curve(example_poly, from = -10, to = 10)
+```
 
-## Monte Carlo
+```{r}
+gauss_legendre_approx <- function(f, gauss_quad_output) {
+  weights <- gauss_quad_output$weights
+  nodes <- gauss_quad_output$nodes
+  approx <- sum(weights * f(nodes))
+  return(approx)
+}
 
-For one-dimensional integrals, quadrature is an appropriate technique. For higher dimensions, however, quadrature rules become far too computationally expensive. Monte Carlo algorithms are a good alternative in these higher dimensions.
+gauss_legendre_approx(example_poly, gauss_3)
+```
+
+This is a very good approximation of the true integral (which is $\frac{46}{15} \approx 3.0666667$). Let's try a higher order polynomial:
+
+```{r}
+higher_order_poly <- function(x) 1 + x + x^2 + x^3 + x^4 + x^5 + x^8 + 11*x^10
+curve(higher_order_poly, from = -10, to = 10)
+
+gauss_legendre_approx(higher_order_poly, gauss_3)
+gauss_legendre_approx(higher_order_poly, gauss_8)
+```
+
+As the number of nodes increases, we get a better approximation of the true integral ($\frac{238}{45} \approx 5.2889$).
+
+
+
+
+
+
+
+
 
