@@ -10,6 +10,89 @@ urlcolor: blue
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## Matrices
+
+A matrix in R is a two-dimensional data structure consisting of columns and rows. They can be constructed using the `matrix()` function, with entries specified by column by default.
+
+### Numerical stability
+
+R has an error of order $10^{-16}$. The `all.equal()` function checks for "near equality" up to a given tolerance, set to $1.5 \times 10^{-8}$ by default, which we can compare to `==`:
+
+```{r}
+one_plus <- 1 + 1e-15
+one <- 1
+one_plus
+one
+one_plus == one
+all.equal(one_plus, one)
+```
+
+R can also store integers as a "long" type, as compared to the numeric type:
+
+```{r}
+class(1)
+class(1L)
+```
+
+
 ## Dense matrices
 
+In the `Matrix` package, `dgeMatrix` is the S4 class for dense matrices.
+
+```{r}
+library(Matrix)
+dense_matrix <- Matrix(c(1, 2, 4, 3, 5, 8, 7, 7, 7), nrow=3, ncol=3)
+class(dense_matrix)
+```
+
+The following code demonstrates some basic matrix operations for dense matrices:
+
+```{r}
+# Invert a matrix:
+solve(dense_matrix)
+# Find the rank of a matrix:
+rankMatrix(dense_matrix)
+# Give the reciprocal condition number (reciprocal of product of norm of matrix and norm of inverse):
+rcond(dense_matrix)
+1 / (norm(dense_matrix) * norm(solve(dense_matrix)))
+```
+
 ## Sparse matrices
+
+Sparse matrices are matrices where most entries are 0. They are typically stored as class `dgCMatrix`, which are stored in a compressed, sparse, column-oriented format to save memory. 
+
+```{r}
+set.seed(17)
+nrows <- 1000
+ncols <- 1000
+vals <- sample(x=c(0, 1, 2), prob=c(0.98, 0.01, 0.01), size=nrows*ncols, replace=TRUE)
+sparse_matrix <- Matrix(vals, nrow=nrows, ncol=ncols, sparse=TRUE)
+class(sparse_matrix)
+```
+
+The following code demonstrates some basic matrix operations for sparse matrices:
+
+```{r}
+# Invert a matrix:
+sparse_inverse <- solve(sparse_matrix)
+class(sparse_inverse) # still dgCMatrix
+# Multiply by a vector:
+class(sparse_inverse %*% c(1, rep(0, 998), 1)) # dgeMatrix
+# Multiply by that vector represented as a sparse matrix:
+class(sparse_inverse %*% Matrix(c(1, rep(0, 998), 1), nrow=1000, ncol=1, sparse=TRUE))
+```
+
+### Dependency graphs
+
+We can use symmetric sparse matrices as adjacency graphs for graphs:
+
+```{r}
+library(igraph)
+sym_sparse <- rsparsematrix(nrow = 10,
+                            ncol = 10,
+                            density = 0.1,
+                            symmetric = TRUE)
+adj_graph <- graph_from_adjacency_matrix(sym_sparse, weighted = TRUE)
+plot(adj_graph)
+```
+
