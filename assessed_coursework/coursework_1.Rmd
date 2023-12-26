@@ -1,6 +1,8 @@
 ---
 title: 'Assessed Coursework #1: Packages'
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 date: "2023-11-02"
 ---
 
@@ -8,11 +10,228 @@ date: "2023-11-02"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-### Expanding package functionality
+## `hull2spatial`
 
-I had an Australian scientist named Fonti Kar reach out to me about how we might modify my R package to be used to convert alpha hulls for IUCN range assessments. The developer of the `alphahull` package, Beatriz Pateiro, has been working on a new feature to create alpha-hull objects following the IUCN Red List method of creation.
+Over the last few years, I have been developing an R package called `hull2spatial` that can be used to convert objects created by the `alphahull` package into spatial objects that are compatible with the `sp` R package. The `hull2spatial` package can be found here: https://github.com/babichmorrowc/hull2spatial.
 
-She can add documentation / tests / GitHub actions / landing page 
-We could do a Hex sticker
-I will work on the maths
-What's the other package that does this?
+```{r}
+# devtools::install_github("https://github.com/babichmorrowc/hull2spatial")
+library(hull2spatial)
+```
+
+## Package motivation
+
+### Example data and cleaning
+
+When modeling the distribution of a given species, ecologists typically have data on given occurrence points where the species has been found, e.g. latitude-longitude coordinates, and want to use those points to infer the region over which the species is distributed. For example, the following data is occurrence points of various species in the infraorder Mygalomorphae (a group of spiders).
+
+```{r message=F}
+library(here) # package for filepaths
+library(arrow) # package to read data from parquet file
+library(sf) # spatial package
+library(tidyverse)
+myg_spiders <- read_parquet(here("data/Mygalomorphae_withassertions_2023-09-18_ALA.parquet"))
+myg_spiders_cleaned <- myg_spiders %>% 
+  filter(!is.na(decimalLatitude) & !is.na(decimalLongitude))  %>% 
+  filter(!duplicated(decimalLatitude) & !duplicated(decimalLongitude)) 
+head(myg_spiders_cleaned)
+```
+
+We use `dplyr` to identify the species with the most occurrences in our dataset:
+
+```{r}
+myg_spiders_cleaned %>% 
+  filter(!is.na(species)) %>% 
+  group_by(species) %>% 
+  summarise(n_occs = n()) %>% 
+  arrange(desc(n_occs)) %>% 
+  head()
+```
+
+We will focus on the species *Missulena occatoria* and plot the occurrence points:
+
+```{r}
+m_occatoria <- myg_spiders_cleaned %>% 
+  filter(species == "Missulena occatoria")
+
+# Create map of Australia
+# Transform projection
+aus <- st_transform(ozmaps::ozmap_country, 4326)
+# Base map 
+base_map <- ggplot() + 
+  geom_sf(data = aus, fill = NA) + 
+  theme_minimal()
+
+base_map +
+  geom_point(data = m_occatoria, aes(x = decimalLongitude, y = decimalLatitude)) +
+  labs(x = "", y = "")
+```
+
+### `alphahull` functions
+
+#### $\alpha$-shapes
+
+The `alphahull` R package provides functions for making two different types of shapes based on points: an $\alpha$-shape and an $\alpha$-hull. Both shapes are governed by a parameter $\alpha$ that determines how convex / concave the resulting shape is.
+
+The following are some $\alpha$-shapes based on the *M. occatoria* occurrence data:
+
+```{r}
+library(alphahull)
+alphashape_5 <- ashape(x = m_occatoria$decimalLongitude,
+                       y = m_occatoria$decimalLatitude,
+                       alpha = 5)
+alphashape_20 <- ashape(x = m_occatoria$decimalLongitude,
+                        y = m_occatoria$decimalLatitude,
+                        alpha = 20)
+alphashape_100 <- ashape(x = m_occatoria$decimalLongitude,
+                         y = m_occatoria$decimalLatitude,
+                         alpha = 100)
+#  create a three-paneled figure
+par(mfrow = c(1,3))
+# Plot alpha = 5
+plot(x = m_occatoria$decimalLongitude, y = m_occatoria$decimalLatitude)
+plot(alphashape_5, add = T)
+# Plot alpha = 20
+plot(x = m_occatoria$decimalLongitude, y = m_occatoria$decimalLatitude)
+plot(alphashape_20, add = T)
+# Plot alpha = 100
+plot(x = m_occatoria$decimalLongitude, y = m_occatoria$decimalLatitude)
+plot(alphashape_100, add = T)
+```
+
+#### $\alpha$-hulls
+
+While $\alpha$-shapes are comprised of straight lines, $\alpha$-hulls consist of arcs. The following are $\alpha$-hulls for the same values of $\alpha$:
+
+```{r}
+alphahull_5 <- ahull(x = m_occatoria$decimalLongitude,
+                     y = m_occatoria$decimalLatitude,
+                     alpha = 5)
+alphahull_20 <- ahull(x = m_occatoria$decimalLongitude,
+                      y = m_occatoria$decimalLatitude,
+                      alpha = 20)
+alphahull_100 <- ahull(x = m_occatoria$decimalLongitude,
+                       y = m_occatoria$decimalLatitude,
+                       alpha = 100)
+#  create a three-paneled figure
+par(mfrow = c(1,3))
+# Plot alpha = 5
+plot(x = m_occatoria$decimalLongitude, y = m_occatoria$decimalLatitude)
+plot(alphahull_5, add = T)
+# Plot alpha = 20
+plot(x = m_occatoria$decimalLongitude, y = m_occatoria$decimalLatitude)
+plot(alphahull_20, add = T)
+# Plot alpha = 100
+plot(x = m_occatoria$decimalLongitude, y = m_occatoria$decimalLatitude)
+plot(alphahull_100, add = T)
+```
+
+Recently, the developer of the `alphahull` package, Beatriz Pateiro, has been working on a new feature to create alpha-hull objects following the IUCN Red List method of creation. This new function is only available from the [IUCN branch](https://github.com/beatrizpateiro/alphahull/tree/WIP-ahull.IUCN-feature) of the `alphahull` package:
+
+```{r}
+# devtools::install_github("beatrizpateiro/alphahull", ref = "WIP-ahull.IUCN-feature")
+library(alphahull)
+```
+
+The following plots show the IUCN $\alpha$-hulls for 3 different values of $\alpha$:
+
+```{r}
+alphahull_iucn_5 <- ahull.IUCN(x = m_occatoria$decimalLongitude,
+                               y = m_occatoria$decimalLatitude,
+                               alpha = 5)
+alphahull_iucn_20 <- ahull.IUCN(x = m_occatoria$decimalLongitude,
+                                y = m_occatoria$decimalLatitude,
+                                alpha = 20)
+alphahull_iucn_100 <- ahull.IUCN(x = m_occatoria$decimalLongitude,
+                                 y = m_occatoria$decimalLatitude,
+                                 alpha = 100)
+#  create a three-paneled figure
+par(mfrow = c(1,3))
+# Plot alpha = 5
+plot(alphahull_iucn_5)
+# Plot alpha = 20
+plot(alphahull_iucn_20)
+# Plot alpha = 100
+plot(alphahull_iucn_100)
+```
+
+## `hull2spatial` functions
+
+When looking at the classes of objects created by `ashape`, `ahull`, and `ahull.IUCN`, note that these are not in a nice polygon form that integrates well with other R packages for spatial data:
+
+```{r}
+class(alphashape_5)
+class(alphahull_5)
+class(alphahull_iucn_5)
+```
+
+I wrote a set of functions that convert those objects into 
+
+### `ashape2poly`
+
+The `ashape2poly` function converts $\alpha$-shape objects (of the class `ashape`) to `SpatialPolygons` objects:
+
+```{r}
+alphashape_poly_20 <- ashape2poly(alphashape_20)
+class(alphashape_poly_20)
+
+alphashape_poly_20_sf <- st_as_sf(alphashape_poly_20) %>% 
+  st_set_crs(4326)
+
+base_map +
+  geom_point(data = m_occatoria, aes(x = decimalLongitude, y = decimalLatitude)) +
+  geom_sf(data = alphashape_poly_20_sf, fill = "purple", alpha = 0.2) +
+  labs(x = "", y = "")
+```
+
+### `ahull2poly`
+
+The `ahull2poly` function converts $\alpha$-hull objects (of the class `ahull`) to `SpatialPolygons` objects:
+
+```{r}
+alphahull_poly_20 <- ahull2poly(alphahull_20)
+class(alphahull_poly_20)
+
+alphahull_poly_20_sf <- st_as_sf(alphahull_poly_20) %>% 
+  st_set_crs(4326)
+
+base_map +
+  geom_point(data = m_occatoria, aes(x = decimalLongitude, y = decimalLatitude)) +
+  geom_sf(data = alphahull_poly_20_sf, fill = "purple", alpha = 0.2) +
+  labs(x = "", y = "")
+```
+
+### `ahullIUCN2poly`
+
+In parallel with Pateiro's work on adding new functionality to the `alphahull` package to create IUCN $\alpha$-hulls, I have created new functions to convert these objects to spatial-package-compatible objects as well. Over the course of the term, I have been working with an Australian scientist named Fonti Kar to collaborate on this new functionality for the package.
+
+```{r}
+# devtools::install_github("babichmorrowc/hull2spatial", ref = "ahull_IUCN_wip")
+library(hull2spatial)
+```
+
+I added two new functions to the package: `ahull.IUCN2lines` and `ahull.IUCN2poly`. The source code for these functions can be found [here](https://github.com/babichmorrowc/hull2spatial/blob/ahull_IUCN_wip/R/IUCNhull2poly.R). These functions also give the flexibility to return objects compatible with either the `sp` package or the `sf` package. Both of these packages are commonly used for spatial analyses in R, with `sp` being the older package and `sf` being a more modern version.
+
+To write these functions, I leveraged the structure of `ahull.IUCN` objects, which contain a two column matrix indicating which points in the occurrence dataset are connected by lines comprising the border of the resulting hull:
+
+```{r}
+alphahull_iucn_20[["bd.ah.IUCN"]]
+```
+
+I used these coordinates to construct a set of lines around the border of the shape and then merged them using the `st_line_merge` function from the `sf` package (see code for [`ahull.IUCN2lines`](https://github.com/babichmorrowc/hull2spatial/blob/ahull_IUCN_wip/R/IUCNhull2poly.R)).
+
+The following code demonstrates the use of `ahull.IUCN2poly` (which calls the `ahull.IUCN2lines` function):
+
+```{r}
+alphahull_iucn_poly_20 <- ahull.IUCN2poly(alphahull_iucn_20, sp_or_sf = "sf") %>% 
+  st_set_crs(4326)
+class(alphahull_iucn_poly_20)
+
+base_map +
+  geom_point(data = m_occatoria, aes(x = decimalLongitude, y = decimalLatitude)) +
+  geom_sf(data = alphahull_iucn_poly_20, fill = "purple", alpha = 0.2) +
+  labs(x = "", y = "")
+```
+
+
+
