@@ -3,12 +3,14 @@ title: 'Assessed Coursework #1: Packages'
 output:
   pdf_document: default
   html_document: default
-date: "2023-11-02"
+date: "2023-12-26"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+In this assessed coursework, I go over the package development package for an R package I have created called `hull2spatial`. The coursework primarily focuses on R package development, while also touching on use of and integration with `tidyverse` and different types of object-oriented programming models in R.
 
 ## `hull2spatial`
 
@@ -233,5 +235,12 @@ base_map +
   labs(x = "", y = "")
 ```
 
+## Next steps
+
+Next, I want to expand the functionality of the `ashape2poly` and `ahull2poly` functions to give compatibility with both the `sp` and `sf` packages as I did with the `ahull.IUCN2poly` function. The `sp` package came out in 2005 and is gradually being replaced by `sf` over time. `sp` uses S4 classes, whereas `sf` uses S3 classes. `sf` integrates well with the `tidyverse` (unlike `sp`), which is why I have primarily used `sf` objects to plot with `ggplot2` in the code above. In order to make `hull2spatial` more flexible and functional with the most up-to-date packages, I want to provide `sf` integration as a key functionality.
+
+Additionally, I want to add more testing into `hull2spatial`. I have added several tests to the package using `testthat` (see tests [here](https://github.com/babichmorrowc/hull2spatial/tree/ahull_IUCN_wip/tests)), but these primarily focus on testing the class of the output of the functions. I want to do more research into how to test functions with outputs that are spatial in nature.
+
+Alongside these improvements, I will continue to work with Dr. Kar and Dr. Pateiro to align my work with the development being done on the `alphahull` package. My hope is that these functions will provide an easy way for ecologists to create a variety of range maps following the IUCN guidelins that can then be integrated with other commonly used R packages.
 
 
