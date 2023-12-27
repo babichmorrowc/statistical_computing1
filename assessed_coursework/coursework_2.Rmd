@@ -1,20 +1,20 @@
 ---
 title: 'Assessed Coursework #2: Profiling, Performance, & Parallelisation'
 output: pdf_document
-date: "2023-12-26"
+date: "2023-12-27"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-In this assessed coursework, I use profiling to identify inefficiencies in the `tune` function of the `e1071` package, particularly focusing on its application to tune support vector machines. The coursework primarily focuses on profiling and parallelisation, as well as the use of vectorisation to improve performance.
+In this assessed coursework, I use profiling to identify inefficiencies in the `tune` function of the `e1071` package, particularly focusing on its application to tune support vector machines. Next, I work on several improvements to the function's efficiency, applying techniques such as `apply` functions and parallelisation. The coursework primarily focuses on profiling and parallel programming, as well as the use of vectorisation to improve performance.
 
 ## Support vector machines
 
 Support vector machines (SVMs) are a classification technique that works to find the optimal decision boundary between classes. To do so, they find the decision boundary with the thickest error margin possible. In situations where perfect classification accuracy on the training data is not possible, as with most real-world datasets, SVMs solve the soft margin problem to find the decision boundary $f(\mathbf{x}; \mathbf{w}) = 0$ in order to minimise $$\lVert \mathbf{w} \rVert^2 + \sum_i \epsilon_i$$ subject to the constraints that, for all $i$, $$y_i f(\mathbf{x}_i; \mathbf{w}) + \epsilon_i \geq 1, \epsilon_i \geq 0$$
 
-Finding a solution to this constrained optimisation problem is difficult for high-dimensional datasets, and these constraints are relatively complex. The primal SVM problem can be reformulated into the dual problem using Lagrange multipliers. The dual problem simplifies the optimization process and allows for the computation of the support vectors without explicitly finding the high-dimensional vector $\mathbf{w}$ in the primal space. The dual problem also enables the use of kernel functions, allowing SVMs to handle non-linear separations efficiently.
+Finding a solution to this constrained optimisation problem is difficult for high-dimensional datasets, and these constraints are relatively complex. The primal SVM problem can be reformulated into the dual problem using Lagrange multipliers. The dual problem simplifies the optimization process and allows for the computation of the support vectors without explicitly finding the high-dimensional vector $\mathbf{w}$ in the primal space. The dual problem also enables the use of kernel functions, allowing SVMs to handle non-linear separations efficiently. However, when solving the dual problem, SVMs are computationally expensive for datasets with large sample sizes.
 
 ### SVM hyperparameters
 
@@ -22,7 +22,7 @@ SVMs rely on the use of several hyperparameters, depending on the use of kernel 
 
 SVMs can also use a variety of kernel functions, which can introduce additional hyperparameters. For instance, if using a radial basis kernel function $$k(\mathbf{x}_i, \mathbf{x}_j) = \exp(-\gamma \lvert \mathbf{x}_i - \mathbf{x}_j \rvert^2)$$ one must also specify the value of the bandwidth $\gamma$.
 
-These hyperparameters should be tuned in order to find the values that yield the best performance. There are several methods for hyperparameter tuning, most notably cross-validation.
+These hyperparameters should be tuned in order to find the values that yield the best performance. There are several methods for hyperparameter tuning, most notably cross-validation. Since cross-validation necessitates the creation of multiple SVMs, the computational burden increases, particularly for datasets with large sample sizes or situations where the number of folds selected for cross-validation is high.
 
 ## `e1071` package
 
@@ -68,7 +68,7 @@ We achieve 100% classification accuracy on the penguin dataset.
 
 Let's try on a larger dataset of abalone data. This example predicts sex of abalones using some variables pertaining to the dimension of their shells. We now use an RBF kernel ($C = 1, \gamma = 0.2$):
 
-```{r}
+```{r message = F}
 library(AppliedPredictiveModeling)
 data("abalone")
 
@@ -173,7 +173,7 @@ By digging into the source code, we can see that `tune` contains 3 for loops nes
 2. Looping over each training sample (10 in the example since we performed 10-fold cross-validation)
 3. Looping over the number of times training is repeated (1 in our example since `nrepeat = 1` by default)
 
-We can eliminate the last loop by using the `replicate` function, which I have applied to create `tune_optimised`:
+We can eliminate the last loop by using the `replicate` function, which is a wrapper for `sapply`. I replaced the final loop with a use of `replicate` to create a new function, `tune_optimised`. Code for the `tune_optimised` function can be viewed [here](https://github.com/babichmorrowc/statistical_computing1/blob/main/R/tune_optimized.R). We can compare how long `tune_optimised` takes as compared to the `e1071::tune` function:
 
 ```{r}
 source(here("R/tune_optimized.R"))
@@ -188,10 +188,10 @@ abalone_tuned_svm_optimised <- tune_optimised(svm,
                                                                          cross = 10))
 tictoc::toc()
 
-abalone_tuned_svm_optmised$best.parameters
+abalone_tuned_svm_optimised$best.parameters
 ```
 
-The results are slightly faster (depending on when it is run), but not by much (and they can be slightly slower as well. We can examine the profiling:
+The results are slightly faster (depending on when it is run), but not by much (and they can be slightly slower as well). We can examine the profiling:
 
 ```{r eval = F}
 profvis(
@@ -217,20 +217,22 @@ We appear to be spending a bit less time on .C, but the `apply` functions are st
 
 ### Parallelization
 
-To improve performance further, we can ap
+To improve performance further, we can try using parallel programming to run the different iterations of cross-validation x parameter combinations in parallel, rather than sequentially via loops. I used the `foreach` and `doParallel` packages to do so. I created a new function, `tune_parallel` (code available [here](https://github.com/babichmorrowc/statistical_computing1/blob/main/R/tune_parallel.R)), which uses 80% of the available cores. In my case, my laptop has 20 cores, so the function uses 16 of them. Rather than using the two loops followed by `replicate`, as in `tune_optimise`, the new function uses two `foreach` statements, with the inner `foreach` using `%dopar%` to execute the code in parallel.
 
-```{r}
+```{r message = F}
 library(foreach)
 library(doParallel)
 source(here("R/tune_parallel.R"))
 tictoc::tic()
-tune_parallel(svm,
-                   Type ~ .,
-                   data = abalone_training,
-                   kernel = "radial",
-                   ranges = list(cost = c(0.5, 1, 1.5),
-                                 gamma = c(0.02, 0.2, 2)),
-                   tunecontrol = tune.control(sampling = "cross"))
+abalone_tuned_svm_parallel <- tune_parallel(svm,
+                                            Type ~ .,
+                                            data = abalone_training,
+                                            kernel = "radial",
+                                            ranges = list(cost = c(0.5, 1, 1.5),
+                                                          gamma = c(0.02, 0.2, 2)),
+                                            tunecontrol = tune.control(sampling = "cross"))
 tictoc::toc()
+abalone_tuned_svm_parallel$best.parameters
 ```
 
+We now see speed improvements of approximately 80%, an enormous improvement. Parallelisation makes the code far more efficient, enabling the possibility of searching far more values of the hyperparameters in tuning without undue computational burden.
