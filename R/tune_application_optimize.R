@@ -30,6 +30,49 @@ classAgreement <- function (tab) {
   p0
 }
 
+# Function for extracting the data for validation
+getValidationData <- function(train.x, validation.x, useFormula, data, train_ind_sample) {
+  if (!is.null(validation.x)) {
+    return(validation.x)
+  } else if (useFormula) {
+    return(data[-train_ind_sample,, drop = FALSE])
+  } else if (inherits(train.x, "matrix.csr")) {
+    return(train.x[-train_ind_sample, ])
+  } else {
+    return(train.x[-train_ind_sample,, drop = FALSE])
+  }
+}
+
+# Function for extracting true y values
+getTrueY <- function(validation.y, useFormula, train.x, data, train_ind_sample) {
+  if (!is.null(validation.y)) {
+    return(validation.y)
+  } else if (useFormula) {
+    if (!is.null(validation.x)) {
+      return(resp(train.x, validation.x))
+    } else {
+      return(resp(train.x, data[-train_ind_sample,]))
+    }
+  } else {
+    return(train.y[-train_ind_sample])
+  }
+}
+
+# Function for computing performance metric
+computeError <- function(true.y, pred, error_fun) {
+  if (!is.null(error_fun)) {
+    return(error_fun(true.y, pred))
+  } else if ((is.logical(true.y) || is.factor(true.y)) && (is.logical(pred) || is.factor(pred) || is.character(pred))) {
+    # Classification error
+    return(1 - classAgreement(table(pred, true.y)))
+  } else if (is.numeric(true.y) && is.numeric(pred)) {
+    # Mean squared error
+    return(crossprod(pred - true.y) / length(pred))
+  } else {
+    stop("Dependent variable has the wrong type!")
+  }
+}
+
 ## parameter handling
 if (tunecontrol$sampling == "cross")
   validation.x <- validation.y <- NULL
@@ -98,47 +141,26 @@ for (para.set in 1:p) {
     
     # Train models and predict validation set
     models <- replicate(tunecontrol$nrepeat, {
-      model <- do.call(METHOD, c(train_data, pars, kernel = kernel))
-      predict.func(model,
-                   if (!is.null(validation.x))
-                   {validation.x}
-                   else if (useFormula)
-                   {data[-train.ind[[sample]],,drop = FALSE]}
-                   else if (inherits(train.x, "matrix.csr"))
-                   {train.x[-train.ind[[sample]],]}
-                   else
-                   {train.x[-train.ind[[sample]],,drop = FALSE]}
-      )
+      model <- do.call(METHOD, c(train_data, pars))
+      predict.func(model, getValidationData(train.x, validation.x, useFormula, data, train.ind[[sample]]))
     }, simplify = FALSE)
     
     ## compute performance measure
-    true.y <- if (!is.null(validation.y)) {
-      validation.y
-    } else if (useFormula) {
-      if (!is.null(validation.x))
-        resp(train.x, validation.x)
-      else
-        resp(train.x, data[-train.ind[[sample]],])
-    } else {
-      train.y[-train.ind[[sample]]]
-    }
+    true.y <- getTrueY(validation.y, useFormula, train.x, data, train.ind[[sample]])
       
     if (is.null(true.y)) true.y <- rep(TRUE, length(pred))
     
-    repeat.errors[reps] <- if (!is.null(tunecontrol$error.fun))
-      tunecontrol$error.fun(true.y, pred)
-    else if ((is.logical(true.y) || is.factor(true.y)) && (is.logical(pred) || is.factor(pred) || is.character(pred))) ## classification error
-      1 - classAgreement(table(pred, true.y))
-    else if (is.numeric(true.y) && is.numeric(pred)) ## mean squared error
-      crossprod(pred - true.y) / length(pred)
-    else
-      stop("Dependent variable has wrong type!")
+    repeat.errors[sample, ] <- sapply(models, function(pred) {
+      computeError(true.y, pred, tunecontrol$error.fun)
+    })
+    
+    
   }
-  sampling.errors[sample] <- tunecontrol$repeat.aggregate(repeat.errors)
+  
+  sampling.errors[, para.set] <- apply(repeat.errors, 1, tunecontrol$repeat.aggregate)
 }
-model.errors[para.set] <- tunecontrol$sampling.aggregate(sampling.errors)
-model.variances[para.set] <- tunecontrol$sampling.dispersion(sampling.errors)
-}
+model.errors <- apply(sampling.errors, 2, tunecontrol$sampling.aggregate)
+model.variances <- apply(sampling.errors, 2, tunecontrol$sampling.dispersion)
 
 ## return results
 best <- which.min(model.errors)

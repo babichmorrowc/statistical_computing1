@@ -1,5 +1,5 @@
 ---
-title: 'Assessed Coursework #2: Performance & Profiling'
+title: 'Assessed Coursework #2: Profiling, Performance, & Parallelisation'
 output: pdf_document
 date: "2023-12-26"
 ---
@@ -8,7 +8,7 @@ date: "2023-12-26"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-In this assessed coursework, I use profiling to identify inefficiencies in the `tune` function of the `e1071` package, particularly focusing on its application to tune support vector machines. The coursework primarily focuses on profiling and common R functions such as vectorisation to improve performance.
+In this assessed coursework, I use profiling to identify inefficiencies in the `tune` function of the `e1071` package, particularly focusing on its application to tune support vector machines. The coursework primarily focuses on profiling and parallelisation, as well as the use of vectorisation to improve performance.
 
 ## Support vector machines
 
@@ -33,6 +33,7 @@ library(tidyverse)
 library(e1071) # svm package
 library(palmerpenguins) # data package
 library(caret) # ML package
+library(here) # filepath package
 
 # Filter to 2 penguin species for binary classification
 adelie_gentoo <- penguins %>% 
@@ -65,7 +66,7 @@ table(penguin_svm_predictions, penguin_testing$species)
 
 We achieve 100% classification accuracy on the penguin dataset.
 
-Let's try on a larger dataset of abalone data. This example predicts sex of abalones using some variables pertaining to the dimension of their shells. We now use an RBF kernel ($C = 1, \gamma = 0.2$:
+Let's try on a larger dataset of abalone data. This example predicts sex of abalones using some variables pertaining to the dimension of their shells. We now use an RBF kernel ($C = 1, \gamma = 0.2$):
 
 ```{r}
 library(AppliedPredictiveModeling)
@@ -84,7 +85,11 @@ abalone_training <- mf_abalone[index,]
 abalone_testing <- mf_abalone[-index,]
 
 # Train a Support Vector Machine (SVM) model
-abalone_svm_model <- svm(Type ~ ., data = abalone_training, kernel = "radial", cost = 1, gamma = 0.2)
+abalone_svm_model <- svm(Type ~ .,
+                         data = abalone_training,
+                         kernel = "radial",
+                         cost = 1,
+                         gamma = 0.2)
 
 # Make predictions on the test set
 abalone_svm_predictions <- predict(abalone_svm_model, newdata = abalone_testing)
@@ -100,7 +105,7 @@ We have poorer performance on this larger dataset. Let's see if tuning the hyper
 
 ### Tuning in `e1071`
 
-The `e1071` package has a `tune` function that tunes hyperparameters using a grid search. We can supply several values for the hyperparameters $C$ and $\gamma$ and `tune` will yield the model with the hyperparameters that performed best, as measured by classification error:
+The `e1071` package has a `tune` function that tunes hyperparameters using a grid search. We can supply several values for the hyperparameters $C$ and $\gamma$, and `tune` will yield the model with the hyperparameters that performed best, as measured by classification error:
 
 ```{r}
 tictoc::tic()
@@ -110,7 +115,8 @@ abalone_tuned_svm <- tune(svm,
                           kernel = "radial",
                           ranges = list(cost = c(0.5, 1, 1.5),
                                         gamma = c(0.02, 0.2, 2)),
-                          tunecontrol = tune.control(sampling = "cross"))
+                          tunecontrol = tune.control(sampling = "cross",
+                                                     cross = 10))
 tictoc::toc()
 ```
 
@@ -120,7 +126,8 @@ Note that running `tune` on these 9 parameter combinations (3 values of $C$ $\ti
 abalone_tuned_svm$best.parameters
 
 # Make predictions on the test set
-tuned_abalone_svm_predictions <- predict(abalone_tuned_svm$best.model, newdata = abalone_testing)
+tuned_abalone_svm_predictions <- predict(abalone_tuned_svm$best.model,
+                                         newdata = abalone_testing)
 
 # Evaluate the model performance
 tuned_abalone_conf_matrix <- table(tuned_abalone_svm_predictions, abalone_testing$Type)
@@ -131,7 +138,9 @@ tuned_abalone_conf_matrix
 
 We have slightly improved accuracy on the new values of the hyperparameters, which use a higher bandwidth value, but performance is still poor. Trying more combinations of $C$ and $\gamma$ is incredibly slow and computationally intensive, however, because of the structure of the `tune` function.
 
-## Profiling `tune`
+## Improving `tune` performance
+
+### Profiling
 
 We can use profiling to determine what is causing the slow performance of `tune`. I copied the source code for `tune` from [here](https://github.com/cran/e1071/blob/master/R/tune.R) into `e1071_tune_copy.R` to explore what's going on within the function:
 
@@ -150,17 +159,78 @@ profvis(
 )
 ```
 
-The profiling results look like this: ![](../images/tune_flame_graph.png) ![](../images/tune_data.png)
+The profiling results look like this:
 
-```{r}
-profvis(
-  source(here("R/tune_application.R"))
-)
-```
+![](../images/tune_flame_graph.png)
+
+![](../images/tune_data.png)
+
+### Removing for-loops
 
 By digging into the source code, we can see that `tune` contains 3 for loops nested within one another:
 
 1. Looping over each parameter combination (9 in total in the example above)
 2. Looping over each training sample (10 in the example since we performed 10-fold cross-validation)
 3. Looping over the number of times training is repeated (1 in our example since `nrepeat = 1` by default)
+
+We can eliminate the last loop by using the `replicate` function, which I have applied to create `tune_optimised`:
+
+```{r}
+source(here("R/tune_optimized.R"))
+tictoc::tic()
+abalone_tuned_svm_optimised <- tune_optimised(svm,
+                                              Type ~ .,
+                                              data = abalone_training,
+                                              kernel = "radial",
+                                              ranges = list(cost = c(0.5, 1, 1.5),
+                                                            gamma = c(0.02, 0.2, 2)),
+                                              tunecontrol = tune.control(sampling = "cross",
+                                                                         cross = 10))
+tictoc::toc()
+
+abalone_tuned_svm_optmised$best.parameters
+```
+
+The results are slightly faster (depending on when it is run), but not by much (and they can be slightly slower as well. We can examine the profiling:
+
+```{r eval = F}
+profvis(
+  {
+    tune_optimised(svm,
+                   Type ~ .,
+                   data = abalone_training,
+                   kernel = "radial",
+                   ranges = list(cost = c(0.5, 1, 1.5),
+                                 gamma = c(0.02, 0.2, 2)),
+                   tunecontrol = tune.control(sampling = "cross"))
+  }
+)
+```
+
+The profiling results with the new function look like this:
+
+![](../images/flame_graph_optimised.png)
+
+![](../images/data_optimised.png)
+
+We appear to be spending a bit less time on .C, but the `apply` functions are still time-consuming.
+
+### Parallelization
+
+To improve performance further, we can ap
+
+```{r}
+library(foreach)
+library(doParallel)
+source(here("R/tune_parallel.R"))
+tictoc::tic()
+tune_parallel(svm,
+                   Type ~ .,
+                   data = abalone_training,
+                   kernel = "radial",
+                   ranges = list(cost = c(0.5, 1, 1.5),
+                                 gamma = c(0.02, 0.2, 2)),
+                   tunecontrol = tune.control(sampling = "cross"))
+tictoc::toc()
+```
 
